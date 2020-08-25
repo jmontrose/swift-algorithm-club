@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		1CB614301F89456C00A14493 /* Tests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CB6142F1F89456C00A14493 /* Tests.swift */; };
 		1CB614371F8945B300A14493 /* View.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E6D68CB1E599CF100161780 /* View.swift */; };
+		883FF90024F045CC00F56FED /* Curves.swift in Sources */ = {isa = PBXBuildFile; fileRef = 883FF8FF24F045CC00F56FED /* Curves.swift */; };
 		8E6D68BA1E59989400161780 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E6D68B91E59989400161780 /* AppDelegate.swift */; };
 		8E6D68C11E59989400161780 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 8E6D68C01E59989400161780 /* Assets.xcassets */; };
 		8E6D68C41E59989400161780 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 8E6D68C21E59989400161780 /* LaunchScreen.storyboard */; };
@@ -29,6 +30,7 @@
 		1CB6142D1F89456C00A14493 /* Tests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = Tests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		1CB6142F1F89456C00A14493 /* Tests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests.swift; sourceTree = "<group>"; };
 		1CB614311F89456C00A14493 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		883FF8FF24F045CC00F56FED /* Curves.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Curves.swift; sourceTree = "<group>"; };
 		8E6D68B61E59989400161780 /* Convex Hull.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Convex Hull.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		8E6D68B91E59989400161780 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		8E6D68C01E59989400161780 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -87,6 +89,7 @@
 			children = (
 				8E6D68B91E59989400161780 /* AppDelegate.swift */,
 				8E6D68CB1E599CF100161780 /* View.swift */,
+				883FF8FF24F045CC00F56FED /* Curves.swift */,
 				8E6D68C01E59989400161780 /* Assets.xcassets */,
 				8E6D68C21E59989400161780 /* LaunchScreen.storyboard */,
 				8E6D68C51E59989400161780 /* Info.plist */,
@@ -159,6 +162,7 @@
 			developmentRegion = English;
 			hasScannedForEncodings = 0;
 			knownRegions = (
+				English,
 				en,
 				Base,
 			);
@@ -208,6 +212,7 @@
 			files = (
 				8E6D68BA1E59989400161780 /* AppDelegate.swift in Sources */,
 				8E6D68CC1E599CF100161780 /* View.swift in Sources */,
+				883FF90024F045CC00F56FED /* Curves.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
