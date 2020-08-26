@@ -9,7 +9,7 @@
 import UIKit
 
 typealias CGPoints = [CGPoint]
-typealias VectorHeadings = [VectorHeading]
+typealias LineSegments = [LineSegment]
 
 extension CGPoint {
     func angle(to point: CGPoint) -> CGFloat {
@@ -31,22 +31,63 @@ struct PointDistance {
     let distance:CGFloat
 }
 
-struct VectorHeading {
-    let a:CGPoint
-    let b:CGPoint
-    let radians:CGFloat
+struct LineSegment {
+    let from:CGPoint
+    let to:CGPoint
+    let deltaX:CGFloat
+    let deltaY:CGFloat
+
+    init(from:CGPoint, to:CGPoint) {
+        self.from = from
+        self.to = to
+        self.deltaX = to.x - from.x
+        self.deltaY = to.y - from.y
+    }
+
+    // TODO: move this out, so we don't call it multiple times
+    func radians() -> CGFloat {
+        from.angle(to: to)
+    }
+
+    func intersects(_ other:LineSegment) -> Bool {
+        let determinant = deltaX * other.deltaY - other.deltaX * deltaY
+        if abs(determinant) < 0.0001 {
+             // if the determinant is effectively zero then the lines are parallel/colinear
+             return false
+        }
+
+        // if the coefficients both lie between 0 and 1 then we have an intersection
+        let ab = ((from.y - other.from.y) * other.deltaX - (from.x - other.from.x) * other.deltaY) / determinant
+
+        if ab > 0 && ab < 1 {
+            let cd = ((from.y - other.from.y) * deltaX - (from.x - other.from.x) * deltaY) / determinant
+
+            if cd > 0 && cd < 1 {
+                return true
+            }
+        }
+        
+        return false
+    }
     
-    init(a:CGPoint, b:CGPoint) {
-        self.a = a
-        self.b = b
-        self.radians = a.angle(to: b)
+    func intersects(_ others:[LineSegment]) -> Bool {
+        for line in others {
+            if self.intersects(line) {
+                return true
+            }
+        }
+        return false
+    }
+    
+    func segment(to next:CGPoint) -> LineSegment {
+        return LineSegment(from: self.to, to: next)
     }
 }
 
-extension VectorHeadings {
-    func sortedByAngle(from angle:CGFloat) -> VectorHeadings {
+extension LineSegments {
+    func sortedByAngle(from angle:CGFloat) -> LineSegments {
         return self.sorted { (a, b) -> Bool in
-            a.radians > b.radians
+            a.radians() > b.radians()
         }
     }
 }
@@ -73,10 +114,14 @@ extension CGPoints {
         }
     }
     
-    func headings(from point:CGPoint) -> [VectorHeading] {
+    func headings(from point:CGPoint) -> [LineSegment] {
         return self.map {
-            VectorHeading(a: $0, b: point)
+            LineSegment(from: point, to: $0)
         }
+    }
+    
+    func intersects(_ segment:LineSegment) -> Bool {
+        return false
     }
 }
 
@@ -87,27 +132,74 @@ func pointDistance(from a: CGPoint, to b: CGPoint) -> CGFloat {
 }
 
 func ConcaveHull(_ rawPoints:[CGPoint], k:Int) -> [CGPoint] {
-    var path = [CGPoint]()
     if rawPoints.count <= 3 {
         return rawPoints
     }
+    let kInc = k // Increment k to expand search distance
     var points = rawPoints.sortedByX()
+    print("starting with \(points)")
+    var path = [CGPoint]()
+    var segments = [LineSegment]()
+    
     path.append(points.first!)
+    // Special start segment points to itself, will be replaced
+    segments.append(LineSegment(from: path.first!, to: path.first!))
+    
     points.removeFirst()
+    print("removed first \(path.first!)")
+    print("leaving \(points)")
 
     while !points.isEmpty {
-        let nearest = CGPoints(points
-            .nearest(to: path.last!)
-            .prefix(k))
-            .headings(from: path.last!)
-            .sortedByAngle(from: 0.0)
-        if nearest.isEmpty {
-            break
+        var workingK = k
+        while true {
+            let nearest = CGPoints(points
+                .nearest(to: path.last!)
+                .prefix(workingK))
+                .headings(from: path.last!)
+                .sortedByAngle(from: 0.0)
+            if nearest.isEmpty {
+                fatalError()
+            }
+            print("nearest \(nearest.count) of \(points.count) \(nearest)")
+            var nextSegment:LineSegment?
+            for candidateSegment in nearest {
+                print("candidateSegment \(candidateSegment)")
+                //let candidate = segments.last!.segment(to: candidateSegment.to)
+                if candidateSegment.intersects(segments.dropLast()) {
+                    print("line cross \(candidateSegment)")
+                    continue
+                }
+                nextSegment = candidateSegment
+                break
+            }
+            if let nextSegment = nextSegment {
+                segments.append(nextSegment)
+                path.append(nextSegment.to)
+                if let nextPointIndex = points.index(of: nextSegment.to) {
+                    points.remove(at: nextPointIndex)
+                } else {
+                    fatalError("missing \(nextSegment.to) from \(points)")
+                }
+                print("selected \(nextSegment)")
+                // HACK
+                return path
+                break
+            } else {
+                print("size check \(nearest.count) \(points.count)")
+                if nearest.count >= points.count {
+                    print("Failed")
+                    return path
+                    //fatalError()
+                }
+                workingK += kInc
+                print("failed, expanding workingK to \(workingK)")
+            }
         }
+
     }
 
     // Back to start
-    path.append(path.first!)
+    //path.append(path.first!)
 
     return path
 }
@@ -224,7 +316,8 @@ class View: UIView {
     let MAX_POINTS = 10
     var _points = [CGPoint]()
     var _convexHull = [CGPoint]()
-    
+    var _concaveHull = [CGPoint]()
+
     var points1:[CGPoint] {
         return [(43.019080134578765, 144.7073152274143), (134.6814073104601, 714.8075999924465), (156.45734513631493, 444.4761522159623), (220.21405908819617, 826.643071100964), (229.70594511849478, 273.3541207183977), (234.80897938688494, 66.11483188977346), (240.74277942714812, 591.5908375076463), (272.61688926620803, 717.1729678209342), (369.0258581815348, 282.3360639594812), (374.4740493701478, 723.403878344317)].map {
             CGPoint(x:$0.0, y:$0.1)
@@ -237,16 +330,23 @@ class View: UIView {
         }
     }
 
-    
+    var points3:[CGPoint] {
+        return [(59, 434), (145, 498), (176, 418), (216, 624), (268, 567), (283, 88), (283, 560), (298, 338), (315, 133), (323, 499)].map {
+            CGPoint(x:$0.0, y:$0.1)
+        }
+    }
+
+
     override init(frame: CGRect) {
         super.init(frame: frame)
         
-        _points = points2
+        _points = points3
         //_points = generateRandomPoints()
         //print("\(_points)")
         //_convexHull = quickHull(points: _points)
         let s = ConvexHull(_points)
         _convexHull = s.hull
+        _concaveHull = ConcaveHull(_points, k: 3)
     }
     
     required init?(coder aDecoder: NSCoder) {
@@ -297,6 +397,17 @@ class View: UIView {
         }
         
         context!.strokePath()
+        
+        if true && !_concaveHull.isEmpty {
+            context!.setStrokeColor(UIColor.blue.cgColor)
+            let firstPoint = _concaveHull.first!
+            context!.move(to: firstPoint)
+            for p in _concaveHull.dropFirst() {
+                context!.addLine(to: p)
+            }
+            context!.addLine(to: firstPoint)
+            context!.strokePath()
+        }
         
         // Draw points
         for p in _points {
