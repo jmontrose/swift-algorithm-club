@@ -315,7 +315,7 @@ func ConcaveHull(_ rawPoints:[CGPoint], k:Int) -> [CGPoint] {
             let nextAngle = nearest.point.angle(to: nextSegment)
             print("nearest \(nearest) ::: this \(thisDistance) / \(thisAngle) next \(nextDistance) / \(nextAngle)")
             
-            if thisAngle.degrees < 90 {
+            if thisAngle.degrees < 45 {
                 print("skip small angle \(thisAngle.degrees)")
             } else {
                 if thisAngle.degrees <= nextAngle.degrees {
@@ -523,7 +523,7 @@ struct ConvexHull {
 
 class View: UIView {
     
-    let MAX_POINTS = 10
+    let MAX_POINTS = 50
     var _points = [CGPoint]()
     var _convexHull = [CGPoint]()
     var _concaveHull = [CGPoint]()
