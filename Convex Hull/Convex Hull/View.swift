@@ -36,18 +36,20 @@ struct LineSegment {
     let to:CGPoint
     let deltaX:CGFloat
     let deltaY:CGFloat
+    let radians:CGFloat?
 
-    init(from:CGPoint, to:CGPoint) {
+    init(from:CGPoint, to:CGPoint, radians:CGFloat? = nil) {
         self.from = from
         self.to = to
         self.deltaX = to.x - from.x
         self.deltaY = to.y - from.y
+        self.radians = radians //from.angle(to: to)
     }
 
     // TODO: move this out, so we don't call it multiple times
-    func radians() -> CGFloat {
-        from.angle(to: to)
-    }
+//    func radians() -> CGFloat {
+//        from.angle(to: to)
+//    }
 
     func intersects(_ other:LineSegment) -> Bool {
         let determinant = deltaX * other.deltaY - other.deltaX * deltaY
@@ -87,7 +89,7 @@ struct LineSegment {
 extension LineSegments {
     func sortedByAngle(from angle:CGFloat) -> LineSegments {
         return self.sorted { (a, b) -> Bool in
-            a.radians() > b.radians()
+            a.radians! > b.radians!
         }
     }
 }
@@ -116,7 +118,7 @@ extension CGPoints {
     
     func headings(from point:CGPoint) -> [LineSegment] {
         return self.map {
-            LineSegment(from: point, to: $0)
+            LineSegment(from: point, to: $0, radians: point.angle(to: $0))
         }
     }
     
@@ -136,7 +138,8 @@ func ConcaveHull(_ rawPoints:[CGPoint], k:Int) -> [CGPoint] {
         return rawPoints
     }
     let kInc = k // Increment k to expand search distance
-    var points = rawPoints.sortedByX()
+    //var points = rawPoints.sortedByX()
+    var points = rawPoints.self.sorted { return $0.x > $1.x }
     print("starting with \(points)")
     var path = [CGPoint]()
     var segments = [LineSegment]()
@@ -182,7 +185,9 @@ func ConcaveHull(_ rawPoints:[CGPoint], k:Int) -> [CGPoint] {
                 }
                 print("selected \(nextSegment)")
                 // HACK
-                return path
+                if false && path.count >= 11 {
+                    return path
+                }
                 break
             } else {
                 print("size check \(nearest.count) \(points.count)")
@@ -347,6 +352,7 @@ class View: UIView {
         let s = ConvexHull(_points)
         _convexHull = s.hull
         _concaveHull = ConcaveHull(_points, k: 3)
+        print("concave: \(_concaveHull)")
     }
     
     required init?(coder aDecoder: NSCoder) {
