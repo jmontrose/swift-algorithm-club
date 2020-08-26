@@ -24,6 +24,17 @@ extension CGPoint {
         
         return radians
     }
+    
+    func angle(to segment:LineSegment) -> MixedAngle {
+        let A=pointDistance(from: self, to: segment.from)
+        let B=pointDistance(from: self, to: segment.to)
+        let C=pointDistance(from: segment.from, to: segment.to)
+        let part1 = A * A + B * B - C * C
+        let part2 = 2.0 * A * B
+        let angle = acos(part1/part2)
+        let d = angle * 180 / .pi
+        return MixedAngle(radians: angle, degrees: d)
+    }
 }
 
 struct PointDistance {
@@ -35,6 +46,11 @@ struct SegmentDistance {
     let segment:LineSegment
     let distance:CGFloat
     let insertIndex:Int
+}
+
+struct MixedAngle {
+    let radians:CGFloat
+    let degrees:CGFloat
 }
 
 struct LineSegment {
@@ -210,7 +226,7 @@ func pointDistance(from a: CGPoint, to b: CGPoint) -> CGFloat {
     return CGFloat(sqrt(xDist * xDist + yDist * yDist))
 }
 
-func ConcaveHull(_ rawPoints:[CGPoint], k:Int) -> [CGPoint] {
+func ConcaveHullFromPoints(_ rawPoints:[CGPoint], k:Int) -> [CGPoint] {
     if rawPoints.count <= 3 {
         return rawPoints
     }
@@ -257,7 +273,7 @@ func ConcaveHull(_ rawPoints:[CGPoint], k:Int) -> [CGPoint] {
     return path
 }
 
-func ConcaveHullDist(_ rawPoints:[CGPoint], k:Int) -> [CGPoint] {
+func ConcaveHull(_ rawPoints:[CGPoint], k:Int) -> [CGPoint] {
     if rawPoints.count <= 3 {
         return rawPoints
     }
@@ -271,17 +287,52 @@ func ConcaveHullDist(_ rawPoints:[CGPoint], k:Int) -> [CGPoint] {
     print("numbers \(rawPoints.count) \(path.count) \(candidates.count)")
     var result = [CGPoint]()
     
-    for (i, point) in path.enumerated() {
-        let prev:CGPoint
-        if i == 0 {
-            prev = path.last!
-        } else {
-            prev = path[i-1]
+    var i = 0
+    var moved = 0
+    while i < path.count {
+        if false && moved >= 1 {
+            break
         }
-        let segment = LineSegment(from: prev, to: point)
-        print("check \(segment)")
-        let nearest = segment.nearest(from: candidates)
-        print("nearest \(nearest)")
+        let point = path[i]
+        let next:CGPoint
+        if i == path.count - 1 {
+            next = path.first!
+        } else {
+            next = path[i+1]
+        }
+        let segment = LineSegment(from: point, to: next)
+        var nextEndIndex = i + 2
+        if nextEndIndex >= path.count {
+            nextEndIndex -= path.count
+        }
+        let nextSegment = LineSegment(from: next, to: path[nextEndIndex])
+        print("check \(segment) \(nextSegment)")
+        let near = segment.nearest(from: candidates)
+        if let nearest = near.first {
+            let nextDistance = nextSegment.distance(from: nearest.point)
+            let thisDistance = segment.distance(from: nearest.point)
+            let thisAngle = nearest.point.angle(to: segment)
+            let nextAngle = nearest.point.angle(to: nextSegment)
+            print("nearest \(nearest) ::: this \(thisDistance) / \(thisAngle) next \(nextDistance) / \(nextAngle)")
+            
+            if thisAngle.degrees < 90 {
+                print("skip small angle \(thisAngle.degrees)")
+            } else {
+                if thisAngle.degrees <= nextAngle.degrees {
+                    print("skip worse angle \(thisAngle.degrees)")
+                } else {
+                    print("expand to \(nearest)")
+                    moved += 1
+                    path.insert(nearest.point, at: i+1)
+                    if let cIndex = candidates.index(of: nearest.point) {
+                        candidates.remove(at: cIndex)
+                    } else {
+                        fatalError("remove failed \(nearest) \(candidates)")
+                    }
+                }
+            }
+        }
+        i += 1
     }
     
     return path
@@ -472,7 +523,7 @@ struct ConvexHull {
 
 class View: UIView {
     
-    let MAX_POINTS = 50
+    let MAX_POINTS = 10
     var _points = [CGPoint]()
     var _convexHull = [CGPoint]()
     var _concaveHull = [CGPoint]()
@@ -499,7 +550,7 @@ class View: UIView {
     override init(frame: CGRect) {
         super.init(frame: frame)
         
-        _points = points1
+        _points = points3
         _points = generateRandomPoints()
         //print("\(_points)")
         //_convexHull = quickHull(points: _points)
