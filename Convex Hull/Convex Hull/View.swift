@@ -31,6 +31,12 @@ struct PointDistance {
     let distance:CGFloat
 }
 
+struct SegmentDistance {
+    let segment:LineSegment
+    let distance:CGFloat
+    let insertIndex:Int
+}
+
 struct LineSegment {
     let from:CGPoint
     let to:CGPoint
@@ -85,6 +91,16 @@ struct LineSegment {
         return LineSegment(from: self.to, to: next)
     }
     
+    func nearest(from points: [CGPoint]) -> [PointDistance] {
+        return points
+            .map {
+                PointDistance(point: $0, distance: self.distance(from:$0))
+            }
+            .sorted { (a, b) -> Bool in
+                a.distance < b.distance
+            }
+    }
+    
     /* Distance of segment from a point */
     func distance(from point: CGPoint) -> CGFloat {
         let pv_dx = point.x - from.x
@@ -115,6 +131,36 @@ struct LineSegment {
 
         return sqrt(dx * dx + dy * dy)
     }
+}
+
+func distanceFromPoint(p: CGPoint, toLineSegment v: CGPoint, and w: CGPoint) -> CGFloat {
+    let pv_dx = p.x - v.x
+    let pv_dy = p.y - v.y
+    let wv_dx = w.x - v.x
+    let wv_dy = w.y - v.y
+
+    let dot = pv_dx * wv_dx + pv_dy * wv_dy
+    let len_sq = wv_dx * wv_dx + wv_dy * wv_dy
+    let param = dot / len_sq
+
+    var int_x, int_y: CGFloat /* intersection of normal to vw that goes through p */
+
+    if param < 0 || (v.x == w.x && v.y == w.y) {
+        int_x = v.x
+        int_y = v.y
+    } else if param > 1 {
+        int_x = w.x
+        int_y = w.y
+    } else {
+        int_x = v.x + param * wv_dx
+        int_y = v.y + param * wv_dy
+    }
+
+    /* Components of normal */
+    let dx = p.x - int_x
+    let dy = p.y - int_y
+
+    return sqrt(dx * dx + dy * dy)
 }
 
 extension LineSegments {
@@ -168,75 +214,76 @@ func ConcaveHull(_ rawPoints:[CGPoint], k:Int) -> [CGPoint] {
     if rawPoints.count <= 3 {
         return rawPoints
     }
-    let kInc = k // Increment k to expand search distance
-    //var points = rawPoints.sortedByX()
-    var points = rawPoints.self.sorted { return $0.x > $1.x }
-    print("starting with \(points)")
-    var path = [CGPoint]()
-    var segments = [LineSegment]()
-    
-    path.append(points.first!)
-    // Special start segment points to itself, will be replaced
-    segments.append(LineSegment(from: path.first!, to: path.first!))
-    
-    points.removeFirst()
-    print("removed first \(path.first!)")
-    print("leaving \(points)")
-
-    while !points.isEmpty {
-        var workingK = k
-        while true {
-            let nearest = CGPoints(points
-                .nearest(to: path.last!)
-                .prefix(workingK))
-                .headings(from: path.last!)
-                .sortedByAngle(from: 0.0)
-            if nearest.isEmpty {
-                fatalError()
-            }
-            print("nearest \(nearest.count) of \(points.count) \(nearest)")
-            var nextSegment:LineSegment?
-            for candidateSegment in nearest {
-                print("candidateSegment \(candidateSegment)")
-                //let candidate = segments.last!.segment(to: candidateSegment.to)
-                if candidateSegment.intersects(segments.dropLast()) {
-                    print("line cross \(candidateSegment)")
-                    continue
-                }
-                nextSegment = candidateSegment
-                break
-            }
-            if let nextSegment = nextSegment {
-                segments.append(nextSegment)
-                path.append(nextSegment.to)
-                if let nextPointIndex = points.index(of: nextSegment.to) {
-                    points.remove(at: nextPointIndex)
-                } else {
-                    fatalError("missing \(nextSegment.to) from \(points)")
-                }
-                print("selected \(nextSegment)")
-                // HACK
-                if false && path.count >= 11 {
-                    return path
-                }
-                break
-            } else {
-                print("size check \(nearest.count) \(points.count)")
-                if nearest.count >= points.count {
-                    print("Failed")
-                    return path
-                    //fatalError()
-                }
-                workingK += kInc
-                print("failed, expanding workingK to \(workingK)")
-            }
+    var path = ConvexHull(rawPoints).hull
+    var candidates = [CGPoint]()
+    for point in rawPoints {
+        if !path.contains(point) {
+            candidates.append(point)
         }
-
     }
+    print("numbers \(rawPoints.count) \(path.count) \(candidates.count)")
+    var result = [CGPoint]()
 
-    // Back to start
-    //path.append(path.first!)
+    for point in candidates {
+        var distances = [SegmentDistance]()
 
+        for (i, pathPoint) in path.enumerated() {
+            let prev:CGPoint
+            if i == 0 {
+                prev = path.last!
+            } else {
+                prev = path[i-1]
+            }
+            let segment = LineSegment(from: prev, to: pathPoint)
+            distances.append(SegmentDistance(segment: segment, distance: segment.distance(from: point), insertIndex: i))
+        }
+        
+        distances.sort { $0.distance < $1.distance }
+        let closest = distances.first!
+        let A=pointDistance(from: point, to: closest.segment.from)
+        let B=pointDistance(from: point, to: closest.segment.to)
+        let C=pointDistance(from: closest.segment.from, to: closest.segment.to)
+        let part1 = A * A + B * B - C * C
+        let part2 = 2.0 * A * B
+        let angle = acos(part1/part2)
+        let d = angle * 180 / .pi
+        print("DIST \(closest) \(angle) \(d)")
+        if d > 90.0 {
+            print("CAVE")
+            path.insert(point, at: closest.insertIndex)
+        }
+    }
+    
+    return path
+}
+
+func ConcaveHullDist(_ rawPoints:[CGPoint], k:Int) -> [CGPoint] {
+    if rawPoints.count <= 3 {
+        return rawPoints
+    }
+    var path = ConvexHull(rawPoints).hull
+    var candidates = [CGPoint]()
+    for point in rawPoints {
+        if !path.contains(point) {
+            candidates.append(point)
+        }
+    }
+    print("numbers \(rawPoints.count) \(path.count) \(candidates.count)")
+    var result = [CGPoint]()
+    
+    for (i, point) in path.enumerated() {
+        let prev:CGPoint
+        if i == 0 {
+            prev = path.last!
+        } else {
+            prev = path[i-1]
+        }
+        let segment = LineSegment(from: prev, to: point)
+        print("check \(segment)")
+        let nearest = segment.nearest(from: candidates)
+        print("nearest \(nearest)")
+    }
+    
     return path
 }
 
@@ -425,7 +472,7 @@ struct ConvexHull {
 
 class View: UIView {
     
-    let MAX_POINTS = 10
+    let MAX_POINTS = 50
     var _points = [CGPoint]()
     var _convexHull = [CGPoint]()
     var _concaveHull = [CGPoint]()
