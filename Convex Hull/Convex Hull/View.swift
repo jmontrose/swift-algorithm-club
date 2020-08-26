@@ -84,6 +84,37 @@ struct LineSegment {
     func segment(to next:CGPoint) -> LineSegment {
         return LineSegment(from: self.to, to: next)
     }
+    
+    /* Distance of segment from a point */
+    func distance(from point: CGPoint) -> CGFloat {
+        let pv_dx = point.x - from.x
+        let pv_dy = point.y - from.y
+        let wv_dx = to.x - from.x
+        let wv_dy = to.y - from.y
+
+        let dot = pv_dx * wv_dx + pv_dy * wv_dy
+        let len_sq = wv_dx * wv_dx + wv_dy * wv_dy
+        let param = dot / len_sq
+
+        var int_x, int_y: CGFloat /* intersection of normal to vw that goes through p */
+
+        if param < 0 || (from.x == to.x && from.y == to.y) {
+            int_x = from.x
+            int_y = from.y
+        } else if param > 1 {
+            int_x = to.x
+            int_y = to.y
+        } else {
+            int_x = from.x + param * wv_dx
+            int_y = from.y + param * wv_dy
+        }
+
+        /* Components of normal */
+        let dx = point.x - int_x
+        let dy = point.y - int_y
+
+        return sqrt(dx * dx + dy * dy)
+    }
 }
 
 extension LineSegments {
@@ -134,6 +165,82 @@ func pointDistance(from a: CGPoint, to b: CGPoint) -> CGFloat {
 }
 
 func ConcaveHull(_ rawPoints:[CGPoint], k:Int) -> [CGPoint] {
+    if rawPoints.count <= 3 {
+        return rawPoints
+    }
+    let kInc = k // Increment k to expand search distance
+    //var points = rawPoints.sortedByX()
+    var points = rawPoints.self.sorted { return $0.x > $1.x }
+    print("starting with \(points)")
+    var path = [CGPoint]()
+    var segments = [LineSegment]()
+    
+    path.append(points.first!)
+    // Special start segment points to itself, will be replaced
+    segments.append(LineSegment(from: path.first!, to: path.first!))
+    
+    points.removeFirst()
+    print("removed first \(path.first!)")
+    print("leaving \(points)")
+
+    while !points.isEmpty {
+        var workingK = k
+        while true {
+            let nearest = CGPoints(points
+                .nearest(to: path.last!)
+                .prefix(workingK))
+                .headings(from: path.last!)
+                .sortedByAngle(from: 0.0)
+            if nearest.isEmpty {
+                fatalError()
+            }
+            print("nearest \(nearest.count) of \(points.count) \(nearest)")
+            var nextSegment:LineSegment?
+            for candidateSegment in nearest {
+                print("candidateSegment \(candidateSegment)")
+                //let candidate = segments.last!.segment(to: candidateSegment.to)
+                if candidateSegment.intersects(segments.dropLast()) {
+                    print("line cross \(candidateSegment)")
+                    continue
+                }
+                nextSegment = candidateSegment
+                break
+            }
+            if let nextSegment = nextSegment {
+                segments.append(nextSegment)
+                path.append(nextSegment.to)
+                if let nextPointIndex = points.index(of: nextSegment.to) {
+                    points.remove(at: nextPointIndex)
+                } else {
+                    fatalError("missing \(nextSegment.to) from \(points)")
+                }
+                print("selected \(nextSegment)")
+                // HACK
+                if false && path.count >= 11 {
+                    return path
+                }
+                break
+            } else {
+                print("size check \(nearest.count) \(points.count)")
+                if nearest.count >= points.count {
+                    print("Failed")
+                    return path
+                    //fatalError()
+                }
+                workingK += kInc
+                print("failed, expanding workingK to \(workingK)")
+            }
+        }
+
+    }
+
+    // Back to start
+    //path.append(path.first!)
+
+    return path
+}
+
+func ConcaveHull1(_ rawPoints:[CGPoint], k:Int) -> [CGPoint] {
     if rawPoints.count <= 3 {
         return rawPoints
     }
@@ -345,8 +452,8 @@ class View: UIView {
     override init(frame: CGRect) {
         super.init(frame: frame)
         
-        _points = points3
-        //_points = generateRandomPoints()
+        _points = points1
+        _points = generateRandomPoints()
         //print("\(_points)")
         //_convexHull = quickHull(points: _points)
         let s = ConvexHull(_points)
